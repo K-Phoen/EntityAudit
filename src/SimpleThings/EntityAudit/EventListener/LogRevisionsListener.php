@@ -181,15 +181,6 @@ class LogRevisionsListener implements EventSubscriber
                 $sql .= ', ' . $class->getQuotedColumnName($field, $this->platform);
             }
 
-            foreach ($class->associationMappings AS $assoc) {
-                if ( ($assoc['type'] & ClassMetadata::TO_ONE) > 0 && $assoc['isOwningSide']) {
-                    foreach ($assoc['targetToSourceKeyColumns'] as $sourceCol) {
-                        $sql .= ', ' . $sourceCol;
-                        $placeholders[] = '?';
-                    }
-                }
-            }
-
             $sql .= ") VALUES (" . implode(", ", $placeholders) . ")";
             $this->insertRevisionSQL[$class->name] = $sql;
         }
@@ -210,28 +201,6 @@ class LogRevisionsListener implements EventSubscriber
         foreach ($class->fieldNames AS $field) {
             $params[] = $entityData[$field];
             $types[] = $class->fieldMappings[$field]['type'];
-        }
-
-        foreach ($class->associationMappings AS $field => $assoc) {
-            if (($assoc['type'] & ClassMetadata::TO_ONE) > 0 && $assoc['isOwningSide']) {
-                $targetClass = $this->em->getClassMetadata($assoc['targetEntity']);
-
-                if ($entityData[$field] !== null) {
-                    $relatedId = $this->uow->getEntityIdentifier($entityData[$field]);
-                }
-
-                $targetClass = $this->em->getClassMetadata($assoc['targetEntity']);
-
-                foreach ($assoc['sourceToTargetKeyColumns'] as $sourceColumn => $targetColumn) {
-                    if ($entityData[$field] === null) {
-                        $params[] = null;
-                        $types[] = \PDO::PARAM_STR;
-                    } else {
-                        $params[] = $relatedId[$targetClass->fieldNames[$targetColumn]];
-                        $types[] = $targetClass->getTypeOfColumn($targetColumn);
-                    }
-                }
-            }
         }
 
         $this->conn->executeUpdate($this->getInsertRevisionSQL($class), $params, $types);
